@@ -3,6 +3,11 @@
 # Tableau global pour stocker les sites à bloquer
 websites_array=()
 
+# Fonction qui demande les entrées
+function website_selector(){
+    =$(whiptail --inputbox "Entrez votre nom :" 10 50 3>&1 1>&2 2>&3)# whiptail --yesno "Voulez-vous continuer ?" 10 50
+}
+
 # Lit les noms de domaine depuis le fichier sites.txt
 function query_websites() {
     local sites_file="sites.txt"
@@ -64,4 +69,4 @@ query_websites
 # Ajoute chaque site dans /etc/hosts
 for site in "${websites_array[@]}"; do
     add_host_under_flow_mode "$site"
-done
+done | whiptail --gauge "Chargement en cours..." 10 50 0
