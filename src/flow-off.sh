@@ -2,20 +2,28 @@
 
 set -e
 
-HOSTS_FILE="/etc/hosts"
+HOSTS_FILE="../hosts"
 
 if [ ! -f "$HOSTS_FILE" ]; then
     echo "Hosts file '$HOSTS_FILE' not found."
     exit 1
 fi
 
-# Fichier temporaire
-TMP_FILE=$(mktemp)
+# Check if flow-mode is already disabled
+function check_flow_mode_disabled {
+    if ! grep -q "#flow-mode" "$HOSTS_FILE"; then
+        echo "Flow-mode is already disabled."
+        exit 0
+    fi
+}
 
-# Remove all lines between "#flow-mode" and the next line starting with "#" or end of file
-sed '/^# flow-mode/,/^#/{/^# flow-mode/p; /^#/{/^# flow-mode/!p;}; /^[^#]/d;}' "$HOSTS_FILE" > "$TMP_FILE"
+function disable_flow_mode {
+    sudo awk '/^#flow-mode/ {skip=1; next} /^#/ { if (skip) {skip=0; print; next}} !skip {print}' \
+        "$HOSTS_FILE" > temp_hosts \
+        && sudo mv temp_hosts "$HOSTS_FILE"
+    echo "Flow-mode has been disabled."
+}
 
-# Remplacer le fichier hosts d'origine par le fichier temporaire
-sudo mv "$TMP_FILE" "$HOSTS_FILE"
 
-echo "Flow-mode disabled !"
+check_flow_mode_disabled
+disable_flow_mode
