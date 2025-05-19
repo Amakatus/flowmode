@@ -1,52 +1,83 @@
 #!/bin/bash
 
-# Tableau global pour stocker les sites à bloquer
-websites_array=()
+# Config whiptail
 
-# Fonction qui demande les entrées
-function website_selector(){
-    =$(whiptail --inputbox "Entrez votre nom :" 10 50 3>&1 1>&2 2>&3)# whiptail --yesno "Voulez-vous continuer ?" 10 50
-}
+export NEWT_COLORS='
+    window=white,blue
+    border=black,blue
+    title=yellow,blue
+    textbox=white,black
+    checkbox=black,lightgray
+    actcheckbox=white,red
+'
 
-# Lit les noms de domaine depuis le fichier sites.txt
-function query_websites() {
-    local sites_file="sites.txt"
-    
-    if [[ ! -f "$sites_file" ]]; then
-        echo "Erreur : le fichier '$sites_file' est introuvable." >&2
-        return 1
-    fi
 
-    websites_array=()
-    while IFS= read -r line; do
-        # Ignore les lignes vides et les commentaires
-        [[ -n "$line" && ! "$line" =~ ^# ]] && websites_array+=("$line")
-    done < "$sites_file"
-}
+# Liste de sites populaires à proposer
+declare -A sites=(
+    ["Facebook"]="www.facebook.com"
+    ["Instagram"]="www.instagram.com"
+    ["TikTok"]="www.tiktok.com"
+    ["Twitter (X)"]="twitter.com"
+    ["YouTube"]="www.youtube.com"
+    ["Reddit"]="www.reddit.com"
+    ["Netflix"]="www.netflix.com"
+    ["Snapchat"]="www.snapchat.com"
+    ["OpenAI"]="openai.com"
+    ["ChatGPT"]="www.chatgpt.com"
+)
 
-# Vérifie si la section #flow-mode existe déjà dans /etc/hosts
+# Fichier temporaire pour sélection
+TEMPFILE=$(mktemp)
+
+# Construire la liste des options pour Whiptail
+options=()
+for name in "${!sites[@]}"; do
+    options+=("$name" "" OFF)
+done
+
+# Affiche la boîte de sélection
+whiptail --title "Sélection des sites à bloquer" \
+         --checklist "Choisissez les sites à bloquer :" \
+         20 78 12 \
+         "${options[@]}" 2> "$TEMPFILE"
+
+# Si l'utilisateur annule
+if [ $? -ne 0 ]; then
+    echo "Opération annulée."
+    rm -f "$TEMPFILE"
+    exit 1
+fi
+
+# Récupérer la sélection
+selection=$(<"$TEMPFILE")
+rm -f "$TEMPFILE"
+
+# Nettoyer les guillemets et extraire les domaines sélectionnés
+selected_domains=()
+for name in $selection; do
+    clean_name=$(echo "$name" | tr -d '"')
+    selected_domains+=("${sites[$clean_name]}")
+done
+
+# Vérifie si #flow-mode est présent
 function flow_mode_exists() {
     grep -Fxq "#flow-mode" /etc/hosts
 }
 
-# Ajoute une entrée 127.0.0.1 <domaine> juste après #flow-mode dans /etc/hosts
+# Ajoute une entrée sous #flow-mode
 function add_host_under_flow_mode() {
     local domain="$1"
-    local ip="127.0.0.1"
-    local entry="$ip $domain"
+    local entry="127.0.0.1 $domain"
 
-    # Ne rien faire si l'entrée existe déjà
-    if grep -Fq "$entry" /etc/hosts; then
+    if grep -Fq "$domain" /etc/hosts; then
         echo "Déjà présent : $entry"
         return
     fi
 
-    # Ajouter la section si elle n'existe pas
     if ! flow_mode_exists; then
         echo -e "\n#flow-mode" >> /etc/hosts
     fi
 
-    # Ajoute l'entrée juste après #flow-mode
     awk -v new_entry="$entry" '
         BEGIN { added=0 }
         {
@@ -61,12 +92,7 @@ function add_host_under_flow_mode() {
     echo "Ajouté sous #flow-mode : $entry"
 }
 
-# ---------- MAIN ----------
-
-# Charge les sites à bloquer
-query_websites
-
-# Ajoute chaque site dans /etc/hosts
-for site in "${websites_array[@]}"; do
-    add_host_under_flow_mode "$site"
-done | whiptail --gauge "Chargement en cours..." 10 50 0
+# Appliquer les blocs
+for domain in "${selected_domains[@]}"; do
+    add_host_under_flow_mode "$domain"
+done
