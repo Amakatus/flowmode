@@ -14,7 +14,8 @@ function query_websites() {
 
     websites_array=()
     while IFS= read -r line; do
-        [[ -n "$line" ]] && websites_array+=("$line")
+        # Ignore les lignes vides et les commentaires
+        [[ -n "$line" && ! "$line" =~ ^# ]] && websites_array+=("$line")
     done < "$sites_file"
 }
 
@@ -30,7 +31,7 @@ function add_host_under_flow_mode() {
     local entry="$ip $domain"
 
     # Ne rien faire si l'entrée existe déjà
-    if grep -Fxq "$entry" /etc/hosts; then
+    if grep -Fq "$entry" /etc/hosts; then
         echo "Déjà présent : $entry"
         return
     fi

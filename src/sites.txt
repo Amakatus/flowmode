@@ -1,5 +1,5 @@
 www.reddit.com
 www.facebook.com
 www.chatgpt.com
-platform.openai.com
 openai.com
+platform.openai.com
