@@ -2,13 +2,22 @@
 
 # Configuration des couleurs whiptail
 export NEWT_COLORS='
-    window=white,blue
-    border=black,blue
-    title=yellow,blue
+    root=green,black
+    border=green,black
+    title=green,black
+    roottext=white,black
+    window=green,black
     textbox=white,black
-    checkbox=black,lightgray
-    actcheckbox=white,red
+    button=black,green
+    compactbutton=white,black
+    listbox=white,black
+    actlistbox=black,white
+    actsellistbox=black,green
+    checkbox=green,black
+    actcheckbox=black,green
 '
+
+
 
 # Envoie le script pour bloquer les sites
 function sites_block(){
