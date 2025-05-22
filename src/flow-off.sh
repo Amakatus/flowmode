@@ -2,7 +2,7 @@
 
 set -e
 
-HOSTS_FILE="../hosts"
+HOSTS_FILE="/etc/hosts"
 
 if [ ! -f "$HOSTS_FILE" ]; then
     echo "Hosts file '$HOSTS_FILE' not found."
