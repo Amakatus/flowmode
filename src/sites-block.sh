@@ -5,7 +5,7 @@ export NEWT_COLORS='
     window=white,blue
     border=black,blue
     title=yellow,blue
-    textbox=white,black
+    textbox=black
     checkbox=black,lightgray
     actcheckbox=white,red
 '
@@ -33,7 +33,7 @@ declare -a options
 declare -a websites_array
 
 # Vérifie la présence d'un fichier de config existante
-load_existing_config() {
+function load_existing_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
         while read -r domain; do
             [[ -n "$domain" ]] && selected_map["$domain"]=1
@@ -41,8 +41,9 @@ load_existing_config() {
     fi
 }
 
+
 # Creer la page whiptail pour selectionner les options
-build_whiptail_options() {
+function build_whiptail_options() {
     options=()
     for label in "${!sites[@]}"; do
         domain="${sites[$label]}"
@@ -54,8 +55,9 @@ build_whiptail_options() {
     done
 }
 
+
 # Affiche whiptail 
-get_user_selection() {
+function get_user_selection() {
     whiptail --title "Blocage de Sites Web" \
              --checklist "Sélectionne les sites à bloquer :" \
              20 70 12 \
@@ -68,8 +70,23 @@ get_user_selection() {
     fi
 }
 
+# Panel whiptail qui permets d'ajouter manuellement des sites
+function build_whiptail_manual(){
+# Option d'ajout manuel
+if whiptail --yesno "Do you want to block manually other(s) website(s) ?" 10 60; then
+    manual_input=$(whiptail --inputbox "Enter domain name (ie : www.snapchat.com / snapchat.com.         Warning : separate with a space for multiple domains !:" 10 70 3>&1 1>&2 2>&3)
+    
+    for domain in $manual_input; do
+        # Ajoute à la map de sélection
+        selected_map["$domain"]=1
+        # Ajoute à la map des sites si besoin (optionnel si tu veux que ça apparaisse dans le futur)
+        sites["$domain"]="$domain"
+    done
+fi
+}
+
 # Enregistre sous forme d'un .txt le fichier de configuration pour les prochains lancements
-save_config() {
+function save_config() {
     selection=$(<"$TEMPFILE")
     rm -f "$TEMPFILE"
     selection=$(echo "$selection" | tr -d '"')
@@ -78,16 +95,26 @@ save_config() {
     for label in $selection; do
         echo "${sites[$label]}" >> "$CONFIG_FILE"
     done
+
+    # Ajouter les domaines manuels (déjà dans selected_map mais pas dans selection)
+    for domain in "${!selected_map[@]}"; do
+        found=0
+        for label in $selection; do
+            [[ "${sites[$label]}" == "$domain" ]] && found=1
+        done
+        [[ $found -eq 0 ]] && echo "$domain" >> "$CONFIG_FILE"
+    done
+
     echo "Configuration sauvegardée dans $CONFIG_FILE."
 }
 
 # Vérifie si la partie flow-mode existe dans le fichier hosts
-flow_mode_exists() {
+function flow_mode_exists() {
     grep -Fxq "#flow-mode" /etc/hosts
 }
 
 # Ajoute une entrée qui pointe vers localhost dans le fichier hosts
-add_host_under_flow_mode() {
+function add_host_under_flow_mode() {
     local domain="$1"
     local entry="127.0.0.1 $domain"
 
@@ -122,6 +149,7 @@ add_host_under_flow_mode() {
 load_existing_config
 build_whiptail_options
 get_user_selection
+build_whiptail_manual
 save_config
 
 # Ajouter les entrées dans /etc/hosts
