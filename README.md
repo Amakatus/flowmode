@@ -5,7 +5,7 @@ Flow-mode est un projet développé dans le cadre de la matière Unix - Linux à
 
     Clonez le projet sur votre machine :
 
-git clone https://github.com/votre-username/flow-mode.git
+git clone https://github.com/Amakatus/flowmode
 cd flow-mode
 
 Rendez le script exécutable :
