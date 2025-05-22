@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# === CONFIG COULEURS ===
+# Configuration des couleurs whiptail
 export NEWT_COLORS='
     window=white,blue
     border=black,blue
@@ -10,11 +10,10 @@ export NEWT_COLORS='
     actcheckbox=white,red
 '
 
-# === FICHIERS DE CONFIGURATION ===
 CONFIG_FILE="blocked_sites.conf"
 TEMPFILE=$(mktemp)
 
-# === LISTE DES SITES DISPONIBLES ===
+# Listes des sites whiptail
 declare -A sites=(
     ["Facebook"]="www.facebook.com"
     ["Instagram"]="www.instagram.com"
@@ -28,48 +27,106 @@ declare -A sites=(
     ["ChatGPT"]="www.chatgpt.com"
 )
 
-# === CHARGER CONFIG EXISTANTE ===
+# Variables globales
 declare -A selected_map
-if [[ -f "$CONFIG_FILE" ]]; then
-    while read -r domain; do
-        [[ -n "$domain" ]] && selected_map["$domain"]=1
-    done < "$CONFIG_FILE"
-fi
+declare -a options
+declare -a websites_array
 
-# === CONSTRUIRE LES OPTIONS WHIPTAIL AVEC PRÉ-SÉLECTION ===
-options=()
-for label in "${!sites[@]}"; do
-    domain="${sites[$label]}"
-    if [[ ${selected_map[$domain]} ]]; then
-        options+=("$label" "" ON)
-    else
-        options+=("$label" "" OFF)
+# Vérifie la présence d'un fichier de config existante
+load_existing_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        while read -r domain; do
+            [[ -n "$domain" ]] && selected_map["$domain"]=1
+        done < "$CONFIG_FILE"
     fi
-done
+}
 
-# === AFFICHER WHIPTAIL ===
-whiptail --title "🛑 Blocage de Sites Web" \
-         --checklist "Sélectionne les sites à bloquer :" \
-         20 70 12 \
-         "${options[@]}" 2> "$TEMPFILE"
+# Creer la page whiptail pour selectionner les options
+build_whiptail_options() {
+    options=()
+    for label in "${!sites[@]}"; do
+        domain="${sites[$label]}"
+        if [[ ${selected_map[$domain]} ]]; then
+            options+=("$label" "" ON)
+        else
+            options+=("$label" "" OFF)
+        fi
+    done
+}
 
-if [ $? -ne 0 ]; then
-    echo "Opération annulée."
+# Affiche whiptail 
+get_user_selection() {
+    whiptail --title "Blocage de Sites Web" \
+             --checklist "Sélectionne les sites à bloquer :" \
+             20 70 12 \
+             "${options[@]}" 2> "$TEMPFILE"
+
+    if [[ $? -ne 0 ]]; then
+        echo "Opération annulée."
+        rm -f "$TEMPFILE"
+        exit 1
+    fi
+}
+
+# Enregistre sous forme d'un .txt le fichier de configuration pour les prochains lancements
+save_config() {
+    selection=$(<"$TEMPFILE")
     rm -f "$TEMPFILE"
-    exit 1
-fi
+    selection=$(echo "$selection" | tr -d '"')
 
-# === TRAITEMENT DE LA NOUVELLE CONFIGURATION ===
-selection=$(<"$TEMPFILE")
-rm -f "$TEMPFILE"
+    > "$CONFIG_FILE"
+    for label in $selection; do
+        echo "${sites[$label]}" >> "$CONFIG_FILE"
+    done
+    echo "Configuration sauvegardée dans $CONFIG_FILE."
+}
 
-# Nettoyer les guillemets
-selection=$(echo "$selection" | tr -d '"')
+# Vérifie si la partie flow-mode existe dans le fichier hosts
+flow_mode_exists() {
+    grep -Fxq "#flow-mode" /etc/hosts
+}
 
-# Créer une nouvelle config propre
-> "$CONFIG_FILE"
-for label in $selection; do
-    echo "${sites[$label]}" >> "$CONFIG_FILE"
+# Ajoute une entrée qui pointe vers localhost dans le fichier hosts
+add_host_under_flow_mode() {
+    local domain="$1"
+    local entry="127.0.0.1 $domain"
+
+    if grep -Fxq "$entry" /etc/hosts; then
+        echo "Déjà présent : $entry"
+        return
+    fi
+
+    if ! flow_mode_exists; then
+        echo -e "\n#flow-mode" >> /etc/hosts
+    fi
+
+    awk -v new_entry="$entry" '
+        BEGIN { added=0 }
+        {
+            print
+            if ($0 == "#flow-mode" && !added) {
+                print new_entry
+                added=1
+            }
+        }
+    ' /etc/hosts > /tmp/hosts.tmp && mv /tmp/hosts.tmp /etc/hosts
+    echo "Ajouté sous #flow-mode : $entry"
+}
+
+# Main
+
+# Si le fichier n'existe pas, le créer vide
+[[ ! -f "$CONFIG_FILE" ]] && touch "$CONFIG_FILE"
+
+# Étapes du programme
+load_existing_config
+build_whiptail_options
+get_user_selection
+save_config
+
+# Ajouter les entrées dans /etc/hosts
+for domain in $(<"$CONFIG_FILE"); do
+    add_host_under_flow_mode "$domain"
 done
 
-echo "Configuration sauvegardée dans $CONFIG_FILE."
+echo "Sites bloqués avec succès."
