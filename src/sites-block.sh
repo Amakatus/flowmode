@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Configuration des couleurs whiptail
 export NEWT_COLORS='
     root=green,black
@@ -17,10 +19,10 @@ export NEWT_COLORS='
     actcheckbox=black,green
 '
 
-CONFIG_FILE="blocked_sites.conf"
+CONFIG_FILE="blocked_sites.txt"
 TEMPFILE=$(mktemp)
 
-# Listes des sites whiptail
+# Listes des sites whiptail par défaut
 declare -A sites=(
     ["Facebook"]="www.facebook.com"
     ["Instagram"]="www.instagram.com"
@@ -34,12 +36,11 @@ declare -A sites=(
     ["ChatGPT"]="www.chatgpt.com"
 )
 
-# Variables globales
-declare -A selected_map
+declare -A selected_map  # Domaines sélectionnés
+declare -A custom_sites  # Domaines customs
 declare -a options
-declare -a websites_array
 
-# Vérifie la présence d'un fichier de config existante
+# Charge la config existante
 function load_existing_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
         while read -r domain; do
@@ -48,26 +49,45 @@ function load_existing_config() {
     fi
 }
 
+# Charge les customs (tous ceux non dans la liste par défaut)
+function load_custom_sites() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        for domain in $(cat "$CONFIG_FILE"); do
+            found=0
+            for d in "${sites[@]}"; do
+                [[ "$domain" == "$d" ]] && found=1 && break
+            done
+            [[ $found -eq 0 ]] && custom_sites["$domain"]="$domain"
+        done
+    fi
+}
 
-# Creer la page whiptail pour selectionner les options
+# Concatène les deux listes pour whiptail
 function build_whiptail_options() {
     options=()
     for label in "${!sites[@]}"; do
         domain="${sites[$label]}"
         if [[ ${selected_map[$domain]} ]]; then
-            options+=("$label" "" ON)
+            options+=("$label" "$domain" ON)
         else
-            options+=("$label" "" OFF)
+            options+=("$label" "$domain" OFF)
+        fi
+    done
+    # Ajoute les customs
+    for domain in "${!custom_sites[@]}"; do
+        if [[ ${selected_map[$domain]} ]]; then
+            options+=("$domain" "$domain" ON)
+        else
+            options+=("$domain" "$domain" OFF)
         fi
     done
 }
 
-
-# Affiche whiptail 
+# Affiche la sélection
 function get_user_selection() {
     whiptail --title "Blocage de Sites Web" \
-             --checklist "Sélectionne les sites à bloquer :" \
-             20 70 12 \
+             --checklist "Sélectionne les sites à bloquer.\n(Désélectionne un domaine custom pour le supprimer)" \
+             20 70 14 \
              "${options[@]}" 2> "$TEMPFILE"
 
     if [[ $? -ne 0 ]]; then
@@ -75,93 +95,93 @@ function get_user_selection() {
         rm -f "$TEMPFILE"
         exit 1
     fi
+
+    # Réinitialiser la map de sélection
+    for d in "${sites[@]}"; do selected_map["$d"]=0; done
+    for d in "${!custom_sites[@]}"; do selected_map["$d"]=0; done
+
+    # Met à jour la map avec la sélection
+    for selected in $(tr -d '"' < "$TEMPFILE"); do
+        # Associe nom du label/domaine à la valeur
+        if [[ ${sites[$selected]+_} ]]; then
+            selected_map["${sites[$selected]}"]=1
+        elif [[ ${custom_sites[$selected]+_} ]]; then
+            selected_map["$selected"]=1
+        else
+            # Peut arriver si on coche un custom domaine dont le label = le domaine
+            selected_map["$selected"]=1
+        fi
+    done
 }
 
-# Panel whiptail qui permets d'ajouter manuellement des sites
+# Ajout manuel de domaines customs
 function build_whiptail_manual(){
-# Option d'ajout manuel
-if whiptail --yesno "Do you want to block manually other(s) website(s) ?" 10 60; then
-    manual_input=$(whiptail --inputbox "Enter domain name (ie : www.snapchat.com / snapchat.com.         Warning : separate with a space for multiple domains !:" 10 70 3>&1 1>&2 2>&3)
-    
-    for domain in $manual_input; do
-        # Ajoute à la map de sélection
-        selected_map["$domain"]=1
-        # Ajoute à la map des sites si besoin (optionnel si tu veux que ça apparaisse dans le futur)
-        sites["$domain"]="$domain"
-    done
-fi
+    if whiptail --yesno "Veux-tu ajouter un autre site personnalisé à bloquer ?" 10 60; then
+        manual_input=$(whiptail --inputbox "Entre un ou plusieurs domaines séparés par un espace (ex: www.site1.com site2.com):" 10 70 3>&1 1>&2 2>&3)
+        for domain in $manual_input; do
+            [[ -n "$domain" ]] || continue
+            selected_map["$domain"]=1
+            custom_sites["$domain"]="$domain"
+        done
+    fi
 }
 
-# Enregistre sous forme d'un .txt le fichier de configuration pour les prochains lancements
+# Sauvegarde la config sélectionnée
 function save_config() {
-    selection=$(<"$TEMPFILE")
-    rm -f "$TEMPFILE"
-    selection=$(echo "$selection" | tr -d '"')
-
     > "$CONFIG_FILE"
-    for label in $selection; do
-        echo "${sites[$label]}" >> "$CONFIG_FILE"
+    # Sites par défaut
+    for label in "${!sites[@]}"; do
+        domain="${sites[$label]}"
+        if [[ ${selected_map[$domain]} -eq 1 ]]; then
+            echo "$domain" >> "$CONFIG_FILE"
+        fi
     done
-
-    # Ajouter les domaines manuels (déjà dans selected_map mais pas dans selection)
-    for domain in "${!selected_map[@]}"; do
-        found=0
-        for label in $selection; do
-            [[ "${sites[$label]}" == "$domain" ]] && found=1
-        done
-        [[ $found -eq 0 ]] && echo "$domain" >> "$CONFIG_FILE"
+    # Customs sélectionnés uniquement
+    for domain in "${!custom_sites[@]}"; do
+        if [[ ${selected_map[$domain]} -eq 1 ]]; then
+            echo "$domain" >> "$CONFIG_FILE"
+        fi
     done
-
     echo "Configuration sauvegardée dans $CONFIG_FILE."
 }
 
-# Vérifie si la partie flow-mode existe dans le fichier hosts
-function flow_mode_exists() {
-    grep -Fxq "#flow-mode" /etc/hosts
+# Nettoie la section #flow-mode dans /etc/hosts
+function clean_flow_mode_hosts() {
+    if grep -q "#flow-mode" /etc/hosts; then
+        # Supprime tout ce qui suit (et y compris) #flow-mode
+        sudo awk '/#flow-mode/ {print; exit} {print}' /etc/hosts > /tmp/hosts.tmp
+        sudo mv /tmp/hosts.tmp /etc/hosts
+    fi
 }
 
-# Ajoute une entrée qui pointe vers localhost dans le fichier hosts
-function add_host_under_flow_mode() {
-    local domain="$1"
-    local entry="127.0.0.1 $domain"
+# Ajoute les domaines sélectionnés dans /etc/hosts sous #flow-mode
+function add_hosts_entries() {
+    sudo bash -c "echo '#flow-mode' >> /etc/hosts"
+    while read -r domain; do
+        [[ -n "$domain" ]] && sudo bash -c "echo '127.0.0.1 $domain' >> /etc/hosts"
+    done < "$CONFIG_FILE"
+}
 
-    if grep -Fxq "$entry" /etc/hosts; then
-        echo "Déjà présent : $entry"
-        return
-    fi
-
-    if ! flow_mode_exists; then
-        echo -e "\n#flow-mode" >> /etc/hosts
-    fi
-
-    awk -v new_entry="$entry" '
-        BEGIN { added=0 }
-        {
-            print
-            if ($0 == "#flow-mode" && !added) {
-                print new_entry
-                added=1
-            }
-        }
-    ' /etc/hosts > /tmp/hosts.tmp && mv /tmp/hosts.tmp /etc/hosts
-    echo "Ajouté sous #flow-mode : $entry"
+# Retire les customs désélectionnés
+function purge_unselected_customs() {
+    for domain in "${!custom_sites[@]}"; do
+        if [[ ${selected_map[$domain]} -ne 1 ]]; then
+            unset custom_sites["$domain"]
+        fi
+    done
 }
 
 # Main
-
-# Si le fichier n'existe pas, le créer vide
 [[ ! -f "$CONFIG_FILE" ]] && touch "$CONFIG_FILE"
 
-# Étapes du programme
 load_existing_config
+load_custom_sites
 build_whiptail_options
 get_user_selection
 build_whiptail_manual
+purge_unselected_customs
 save_config
-
-# Ajouter les entrées dans /etc/hosts
-for domain in $(<"$CONFIG_FILE"); do
-    add_host_under_flow_mode "$domain"
-done
+clean_flow_mode_hosts
+add_hosts_entries
 
 echo "Sites bloqués avec succès."
