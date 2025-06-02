@@ -56,7 +56,7 @@ enable_notifications() {
 
     # Hyprland (swaync)
     if pgrep swaync &>/dev/null; then
-        swaync-client -dn -t 2>/dev/null || true
+        swaync-client -df -t 2>/dev/null || true
     fi
 }
 

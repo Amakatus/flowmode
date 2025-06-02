@@ -24,6 +24,12 @@ function disable_flow_mode {
     echo "Flow-mode has been disabled."
 }
 
+function enable_notification {
+    bash enable-notification.sh
+    echo "Notifications are back."
+}
+
 
 check_flow_mode_disabled
 disable_flow_mode
+enable_notification

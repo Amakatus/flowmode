@@ -154,7 +154,7 @@ function clean_flow_mode_hosts() {
 
 # Ajoute les domaines sélectionnés dans /etc/hosts sous #flow-mode
 function add_hosts_entries() {
-    #sudo bash -c "echo '#flow-mode' >> /etc/hosts"
+    sudo bash -c "echo '#flow-mode' >> /etc/hosts"
     while read -r domain; do
         [[ -n "$domain" ]] && sudo bash -c "echo '127.0.0.1 $domain' >> /etc/hosts"
     done < "$CONFIG_FILE"
