@@ -33,17 +33,5 @@ function sites_notification(){
     fi
 }
 
-# Menu Rofi
-CHOICE=$(printf "Bloquer sites\nDésactiver notifications" | rofi -dmenu -p "Flow-mode")
-
-case "$CHOICE" in
-    "Bloquer sites")
-        sites_block
-        ;;
-    "Désactiver notifications")
-        sites_notification
-        ;;
-    *)
-        echo "Action annulée."
-        ;;
-esac
+sites_block
+sites_notification
