@@ -24,8 +24,8 @@ Pour activer Flow-mode et bloquer les distractions, lancez le script flow-on.sh 
 cd src/
 ./flow-on.sh
 ```
-
-Cela bloquera les sites populaires et désactivera les notifications pour vous permettre de rester concentré.
+Cela bloquera les sites populaires et désactivera les notifications pour vous permettre de rester concentré.    
+Vous pouvez également personaliser les sites à bloquer via l'interface.
 
 ### Désactiver le mode concentration
 
