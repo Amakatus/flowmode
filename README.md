@@ -3,35 +3,42 @@
 Flow-mode est un projet développé dans le cadre de la matière Unix - Linux à JUNIA ISEN. Il permet de couper les notifications et de bloquer l'accès à certains sites populaires afin d'améliorer la productivité et la concentration.
 
 ## 💻 Installation
+
 Clonez le projet sur votre machine :
 ```
 git clone https://github.com/Amakatus/flowmode
-cd flow-mode
+cd flowmode
 ```
-Rendez le script exécutable :
 
+Rendez les scripts exécutable :
 ```
-chmod +x flow-on.sh flow-off.sh
+chmod +x src/*
 ```
 
 ## ⚡ Utilisation
-Activer le mode concentration
+### Activer le mode concentration
 
 Pour activer Flow-mode et bloquer les distractions, lancez le script flow-on.sh :
 
+```bash
+cd src/
 ./flow-on.sh
+```
 
 Cela bloquera les sites populaires et désactivera les notifications pour vous permettre de rester concentré.
-Désactiver le mode concentration
+
+### Désactiver le mode concentration
 
 Si vous souhaitez revenir à votre état normal, exécutez le script flow-off.sh :
 
+```bash
 ./flow-off.sh
+```
 
-## Exemple
+## 📝 Améliorations prévues
 
-$ git clone https://github.com/votre-username/flow-mode.git
-$ cd flow-mode
-$ chmod +x flow-on.sh flow-off.sh
-$ ./flow-on.sh    # Active le mode concentration
-$ ./flow-off.sh   # Désactive le mode concentration
+### Rofi
+Démarrage des fonctionnalités au travers de la fenêtre d'interaction `Rofi`
+
+### Script d'initialisation
+Fournir à l'utilisateur un script d'initialisation afin de préparer son système au Flow-mode (détection et installation des paquets en fonction du système d'exploitation)
